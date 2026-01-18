@@ -1,1 +1,13 @@
+.bundle
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+*.log
+*.bak
+*.swp
+dist
 node_modules
+*.code-workspace
+.vscode
+config.yaml
