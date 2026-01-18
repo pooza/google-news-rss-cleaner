@@ -130,4 +130,4 @@ app.get('/clean', async (req, res) => {
   res.send(xml);
 });
 
-app.listen(3000, () => console.log('listening on http://localhost:3000'));
+app.listen(3000, '0.0.0.0', () => console.log('listening on 0.0.0.0:3000'));
