@@ -114,8 +114,8 @@ app.get('/clean', async (req, res) => {
 
       out.item({
         title: item.title ?? finalUrl,
-        url: finalUrl,          // <link> を最終URLへ
-        guid: googleNewsLink,   // guid は元URL（保険）
+        url: finalUrl, // <link> を最終URLへ
+        guid: googleNewsLink, // guid は元URL（保険）
         date: pubDate ? new Date(pubDate) : undefined,
         description: '',
       });

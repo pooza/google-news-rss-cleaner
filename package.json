@@ -5,7 +5,9 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "lint": "npx eslint .",
+    "format": "npx prettier --write \"**/*.{js,cjs}\""
   },
   "dependencies": {
     "express": "^4.19.2",
@@ -13,5 +15,9 @@
     "playwright": "^1.50.0",
     "rss": "^1.2.2",
     "rss-parser": "^3.13.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.2",
+    "prettier": "^3.8.0"
   }
 }
