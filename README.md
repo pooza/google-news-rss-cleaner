@@ -7,7 +7,7 @@ Google News RSS は現在、単純なリダイレクトではなく JS を用い
 このサービスでは **ヘッドレスブラウザ（Playwright）** を用いて「人間が踏んだのと同じ挙動」で URL を解決します。
 
 本サービスは **LAN 内利用を前提**とし、
-上位レイヤー（例: tomato-shrieker）でキャッシュを持つことを想定しています。
+上位レイヤー（例: [tomato-shrieker](https://github.com/pooza/tomato-shrieker)）でキャッシュを持つことを想定しています。
 
 ## 特徴
 
@@ -23,7 +23,7 @@ Google News RSS は現在、単純なリダイレクトではなく JS を用い
 ## 想定構成
 
 ```
-FreeBSD / tomato-shrieker
+FreeBSD / [tomato-shrieker](https://github.com/pooza/tomato-shrieker)
 →（HTTP / RSS）
 Ubuntu / google-news-rss-cleaner
 →（Playwright / Chromium）
@@ -31,7 +31,7 @@ Google News / 元記事サイト
 ```
 
 - ブラウザ依存・OS依存が強い処理は Ubuntu 側に隔離
-- tomato-shrieker 側では通常の RSS として扱う
+- [tomato-shrieker](https://github.com/pooza/tomato-shrieker) 側では通常の RSS として扱う
 
 ## 動作環境
 
@@ -96,7 +96,7 @@ https://news.google.com/rss/search?q=プリキュア&hl=ja&gl=JP&ceid=JP:ja
 
 - URL 解決はヘッドレスブラウザで実行
 - 機械的な JS 解釈は行わない
-- キャッシュは上位レイヤー（tomato-shrieker 等）で持つ
+- キャッシュは上位レイヤー（[tomato-shrieker](https://github.com/pooza/tomato-shrieker) 等）で持つ
 - 本サービスは
   「Google News RSS を人間向け挙動で正規化する踏み台」
   に徹する
