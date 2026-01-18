@@ -8,7 +8,7 @@ Type=simple
 User=googlenews
 WorkingDirectory=/opt/google-news-rss-cleaner
 Environment=NODE_ENV=production
-Environment="NODE_VERSION=v24.13.0
+Environment=NODE_VERSION=v24.13.0
 ExecStart=/usr/bin/npm start
 Restart=always
 RestartSec=3
