@@ -36,7 +36,7 @@ Google News / 元記事サイト
 ## 動作環境
 
 - Ubuntu（22.04 以降推奨）
-- Node.js 18 以上
+- Node.js 24 以上
 - Playwright（Chromium）
 
 ※ FreeBSD では Playwright が公式サポート外のため非対応
