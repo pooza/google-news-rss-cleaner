@@ -72,12 +72,11 @@ async function resolveFinalUrl(googleNewsUrl) {
 }
 
 app.get('/clean', async (req, res) => {
-  const src = typeof req.query.src === 'string' ? req.query.src : null;
   const q = typeof req.query.q === 'string' ? req.query.q : null;
 
-  const feedUrl = src ?? (q ? buildGoogleNewsRssUrl(q) : null);
+  const feedUrl = buildGoogleNewsRssUrl(q);
   if (!feedUrl) {
-    res.status(400).send('missing src or q');
+    res.status(400).send('missing q');
     return;
   }
 

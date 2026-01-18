@@ -121,17 +121,11 @@ sudo systemctl status google-news-rss-cleaner --no-pager
 
 ### 検索語を指定する場合
 
-http://<server-ip>:3000/clean?q=プリキュア
+http://service-server:3000/clean?q=プリキュア
 
 内部的に以下の Google News RSS を生成して処理します。
 
 https://news.google.com/rss/search?q=プリキュア&hl=ja&gl=JP&ceid=JP:ja
-
-### RSS URL を直接指定する場合
-
-http://<server-ip>:3000/clean?src=<Google News RSS URL>
-
-※ URL は必要に応じてエンコードしてください。
 
 ## 設計方針・割り切り
 
