@@ -1,0 +1,24 @@
+[Unit]
+Description=Google News RSS Cleaner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=googlenews
+WorkingDirectory=/opt/google-news-rss-cleaner
+Environment=NODE_ENV=production
+Environment="NODE_VERSION=v24.13.0
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=3
+LimitNOFILE=65536
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/google-news-rss-cleaner /var/lib/googlenews
+
+[Install]
+WantedBy=multi-user.target

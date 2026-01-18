@@ -83,31 +83,7 @@ sudo chown -R googlenews:googlenews /opt/google-news-rss-cleaner
 
 /etc/systemd/system/google-news-rss-cleaner.service
 
-```systemd
-[Unit]
-Description=Google News RSS Cleaner
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=googlenews
-WorkingDirectory=/opt/google-news-rss-cleaner
-Environment=NODE_ENV=production
-ExecStart=/usr/bin/npm start
-Restart=always
-RestartSec=3
-LimitNOFILE=65536
-
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=full
-ProtectHome=true
-ReadWritePaths=/opt/google-news-rss-cleaner /var/lib/googlenews
-
-[Install]
-WantedBy=multi-user.target
-```
+[サンプル](./sample/google-news-rss-cleaner.service)
 
 有効化と起動：
 
