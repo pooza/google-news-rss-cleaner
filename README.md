@@ -56,7 +56,6 @@ cd google-news-rss-cleaner
 ### 依存関係のインストール
 
 ```bin
-npm ci
 npx playwright install --with-deps chromium
 ```
 
@@ -65,7 +64,7 @@ npx playwright install --with-deps chromium
 ### 開発・確認用
 
 ```bin
-npm start
+yarn start
 ```
 
 デフォルトで 0.0.0.0:3000 で待ち受けます。
