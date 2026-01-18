@@ -49,7 +49,7 @@ Google News / 元記事サイト
 
 ```bin
 cd /opt
-git clone <this-repository> google-news-rss-cleaner
+git clone https://github.com/pooza/google-news-rss-cleaner
 cd google-news-rss-cleaner
 ```
 
