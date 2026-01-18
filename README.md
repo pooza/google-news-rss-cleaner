@@ -45,10 +45,10 @@ Google News / 元記事サイト
 
 ### リポジトリ配置
 
-/opt に配置する例：
+~/repos に配置する例：
 
 ```bin
-cd /opt
+cd ~/repos
 git clone https://github.com/pooza/google-news-rss-cleaner
 cd google-news-rss-cleaner
 ```
@@ -71,17 +71,9 @@ yarn start
 
 ## systemd で常時起動（推奨）
 
-### サービスユーザー作成
-
-```bin
-sudo useradd --system --create-home --home /var/lib/googlenews --shell /usr/sbin/nologin googlenews
-sudo chown -R googlenews:googlenews /opt/google-news-rss-cleaner
-```
-
 ### unit ファイル
 
 /etc/systemd/system/google-news-rss-cleaner.service
-
 [サンプル](./sample/google-news-rss-cleaner.service)
 
 有効化と起動：

@@ -5,20 +5,16 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=googlenews
-WorkingDirectory=/opt/google-news-rss-cleaner
+User=pooza
+WorkingDirectory=/home/pooza/repos/google-news-rss-cleaner
 Environment=NODE_ENV=production
 Environment=NODE_VERSION=v24.13.0
-ExecStart=/usr/bin/npm start
+ExecStart=/home/pooza/.nvm/nvm-exec yarn start
+TimeoutSec=60
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=google-news-rss-cleaner
 Restart=always
-RestartSec=3
-LimitNOFILE=65536
-
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=full
-ProtectHome=true
-ReadWritePaths=/opt/google-news-rss-cleaner /var/lib/googlenews
 
 [Install]
 WantedBy=multi-user.target
