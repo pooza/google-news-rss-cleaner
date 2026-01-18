@@ -86,8 +86,6 @@ sudo systemctl status google-news-rss-cleaner --no-pager
 
 ## 使い方
 
-### 検索語を指定する場合
-
 http://service-server:3000/clean?q=プリキュア
 
 内部的に以下の Google News RSS を生成して処理します。
