@@ -31,41 +31,61 @@ function buildGoogleNewsRssUrl(q) {
   return `${base}?${params.toString()}`;
 }
 
+function isGoogleNewsUrl(url) {
+  try {
+    return new URL(url).hostname.endsWith('news.google.com');
+  } catch {
+    return false;
+  }
+}
+
 async function resolveFinalUrl(googleNewsUrl) {
   const cached = urlCache.get(googleNewsUrl);
   if (cached) return cached;
 
   const browser = await getBrowser();
-  const context = await browser.newContext({
-    userAgent:
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari/537.36',
-  });
 
-  await context.route('**/*', (route) => {
-    const type = route.request().resourceType();
-    if (type === 'image' || type === 'media' || type === 'font') return route.abort();
-    return route.continue();
-  });
+  async function tryResolve(timeout) {
+    const context = await browser.newContext({
+      userAgent:
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari/537.36',
+    });
 
-  const page = await context.newPage();
-  await page.goto(googleNewsUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
-  await page.waitForTimeout(1200);
+    await context.route('**/*', (route) => {
+      const type = route.request().resourceType();
+      if (type === 'image' || type === 'media' || type === 'font') return route.abort();
+      return route.continue();
+    });
 
-  let finalUrl = page.url();
-  await context.close();
+    try {
+      const page = await context.newPage();
+      await page.goto(googleNewsUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
 
-  if (!finalUrl || finalUrl.includes('news.google.com/articles/')) {
-    // 1回だけ追加待ちでリトライ
-    const context2 = await browser.newContext();
-    const page2 = await context2.newPage();
-    await page2.goto(googleNewsUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
-    await page2.waitForTimeout(2500);
-    finalUrl = page2.url();
-    await context2.close();
+      // news.google.com 以外のURLへ遷移するのを待つ
+      try {
+        await page.waitForURL((url) => !url.toString().includes('news.google.com'), {
+          timeout,
+        });
+      } catch {
+        // タイムアウトしても現在のURLを試す
+      }
+
+      return page.url();
+    } finally {
+      await context.close();
+    }
+  }
+
+  // 1回目: 5秒待ち
+  let finalUrl = await tryResolve(5000);
+
+  // まだ news.google.com なら、リトライ（8秒待ち）
+  if (!finalUrl || isGoogleNewsUrl(finalUrl)) {
+    finalUrl = await tryResolve(8000);
   }
 
   // 失敗したら壊さない：元URLを返す
-  if (!finalUrl || finalUrl.includes('news.google.com/articles/')) return googleNewsUrl;
+  if (!finalUrl || isGoogleNewsUrl(finalUrl)) return googleNewsUrl;
 
   urlCache.set(googleNewsUrl, finalUrl);
   return finalUrl;
