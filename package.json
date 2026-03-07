@@ -6,8 +6,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "lint": "npx eslint .",
-    "format": "npx prettier --write \"**/*.{js,cjs}\""
+    "lint": "eslint .",
+    "format": "prettier --write \"**/*.{js,cjs}\""
   },
   "dependencies": {
     "express": "^4.19.2",
