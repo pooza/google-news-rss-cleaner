@@ -4,7 +4,7 @@ import RSS from 'rss';
 import { chromium } from 'playwright';
 import { LRUCache } from 'lru-cache';
 import syslog from 'modern-syslog';
-import { sanitizePublishedAt, extractPublishedAt } from './lib/extract.js';
+import { extractPublishedAt } from './lib/extract.js';
 
 syslog.open('google-news-rss-cleaner', syslog.LOG_PID, syslog.LOG_DAEMON);
 
@@ -51,30 +51,22 @@ function isGoogleNewsUrl(url) {
   }
 }
 
-async function resolveArticle(googleNewsUrl, gnPubDate) {
+async function resolveArticle(googleNewsUrl) {
   const start = Date.now();
 
   const cached = urlCache.get(googleNewsUrl);
   if (cached && typeof cached === 'object') {
-    let publishedAt = cached.publishedAt;
-    let via = publishedAt ? 'cache' : 'none';
-    if (!publishedAt) {
-      const gnSane = sanitizePublishedAt(gnPubDate);
-      if (gnSane) {
-        publishedAt = gnSane;
-        via = 'fallback-google-news';
-      }
-    }
+    const via = cached.publishedAt ? 'cache' : 'none';
     logInfo({
       event: 'resolve',
       cached: true,
       googleNewsUrl,
       finalUrl: cached.finalUrl,
-      publishedAt,
+      publishedAt: cached.publishedAt,
       via,
       durationMs: Date.now() - start,
     });
-    return { finalUrl: cached.finalUrl, publishedAt };
+    return { finalUrl: cached.finalUrl, publishedAt: cached.publishedAt, via };
   }
 
   const browser = await getBrowser();
@@ -83,6 +75,8 @@ async function resolveArticle(googleNewsUrl, gnPubDate) {
     const context = await browser.newContext({
       userAgent:
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari/537.36',
+      timezoneId: 'Asia/Tokyo',
+      locale: 'ja-JP',
     });
     await context.route('**/*', (route) => {
       const type = route.request().resourceType();
@@ -121,7 +115,7 @@ async function resolveArticle(googleNewsUrl, gnPubDate) {
       message: e?.message ?? String(e),
       durationMs: Date.now() - start,
     });
-    return { finalUrl: googleNewsUrl, publishedAt: null };
+    return { finalUrl: null, publishedAt: null, via: 'error' };
   }
 
   if (!result.finalUrl) {
@@ -129,27 +123,19 @@ async function resolveArticle(googleNewsUrl, gnPubDate) {
       event: 'resolve',
       cached: false,
       googleNewsUrl,
-      finalUrl: googleNewsUrl,
+      finalUrl: null,
       publishedAt: null,
       via: 'none',
       durationMs: Date.now() - start,
     });
-    return { finalUrl: googleNewsUrl, publishedAt: null };
+    return { finalUrl: null, publishedAt: null, via: 'none' };
   }
 
-  urlCache.set(googleNewsUrl, {
-    finalUrl: result.finalUrl,
-    publishedAt: result.publishedAt,
-  });
-
-  let publishedAt = result.publishedAt;
-  let via = result.via;
-  if (!publishedAt) {
-    const gnSane = sanitizePublishedAt(gnPubDate);
-    if (gnSane) {
-      publishedAt = gnSane;
-      via = 'fallback-google-news';
-    }
+  if (result.via !== 'timeout') {
+    urlCache.set(googleNewsUrl, {
+      finalUrl: result.finalUrl,
+      publishedAt: result.publishedAt,
+    });
   }
 
   logInfo({
@@ -157,12 +143,12 @@ async function resolveArticle(googleNewsUrl, gnPubDate) {
     cached: false,
     googleNewsUrl,
     finalUrl: result.finalUrl,
-    publishedAt,
-    via,
+    publishedAt: result.publishedAt,
+    via: result.via,
     durationMs: Date.now() - start,
   });
 
-  return { finalUrl: result.finalUrl, publishedAt };
+  return { finalUrl: result.finalUrl, publishedAt: result.publishedAt, via: result.via };
 }
 
 app.get('/clean', async (req, res) => {
@@ -203,15 +189,23 @@ app.get('/clean', async (req, res) => {
       const googleNewsLink = item.link;
       if (!googleNewsLink) continue;
 
-      const gnPubDate = item.isoDate ?? item.pubDate ?? null;
-      const { finalUrl, publishedAt } = await resolveArticle(googleNewsLink, gnPubDate);
+      const { finalUrl, publishedAt, via } = await resolveArticle(googleNewsLink);
+      if (!publishedAt) {
+        logInfo({
+          event: 'drop',
+          googleNewsUrl: googleNewsLink,
+          finalUrl,
+          title: item.title,
+          via,
+        });
+        continue;
+      }
 
-      const dateStr = publishedAt ?? gnPubDate ?? undefined;
       out.item({
         title: item.title ?? finalUrl,
         url: finalUrl,
         guid: googleNewsLink,
-        date: dateStr ? new Date(dateStr) : undefined,
+        date: new Date(publishedAt),
         description: '',
       });
     }

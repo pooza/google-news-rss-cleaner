@@ -56,11 +56,12 @@ async function fixtureTests(browser) {
     { file: 'ogp.html', via: 'ogp', publishedAt: '2022-03-20T01:00:00.000Z' },
     { file: 'microdata.html', via: 'microdata', publishedAt: '2019-05-04T06:00:00.000Z' },
     { file: 'time-tag.html', via: 'time-tag', publishedAt: '2018-11-11T09:30:00.000Z' },
+    { file: 'time-tag-text.html', via: 'time-tag', publishedAt: '2020-11-27T09:00:00.000Z' },
     { file: 'dc-date.html', via: 'dc-date', publishedAt: '2021-07-15T00:30:00.000Z' },
     { file: 'empty.html', via: 'none', publishedAt: null },
   ];
   for (const c of cases) {
-    const context = await browser.newContext();
+    const context = await browser.newContext({ timezoneId: 'Asia/Tokyo', locale: 'ja-JP' });
     try {
       const page = await context.newPage();
       await page.goto(fixtureUrl(c.file), { waitUntil: 'domcontentloaded' });
