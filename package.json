@@ -1,17 +1,19 @@
 {
   "name": "google-news-rss-cleaner",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "lint": "eslint .",
-    "format": "prettier --write \"**/*.{js,cjs}\""
+    "format": "prettier --write \"**/*.{js,cjs}\"",
+    "verify": "node scripts/verify-extract.mjs"
   },
   "dependencies": {
     "express": "^4.19.2",
     "lru-cache": "^11.0.2",
+    "modern-syslog": "^1.2.0",
     "playwright": "^1.50.0",
     "rss": "^1.2.2",
     "rss-parser": "^3.13.0"

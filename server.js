@@ -3,6 +3,18 @@ import Parser from 'rss-parser';
 import RSS from 'rss';
 import { chromium } from 'playwright';
 import { LRUCache } from 'lru-cache';
+import syslog from 'modern-syslog';
+import { extractPublishedAt } from './lib/extract.js';
+
+syslog.open('google-news-rss-cleaner', syslog.LOG_PID, syslog.LOG_DAEMON);
+
+function logInfo(fields) {
+  syslog.log(syslog.LOG_INFO, JSON.stringify({ at: new Date().toISOString(), ...fields }));
+}
+
+function logError(fields) {
+  syslog.log(syslog.LOG_ERR, JSON.stringify({ at: new Date().toISOString(), ...fields }));
+}
 
 const app = express();
 const parser = new Parser({
@@ -39,71 +51,121 @@ function isGoogleNewsUrl(url) {
   }
 }
 
-async function resolveFinalUrl(googleNewsUrl) {
+async function resolveArticle(googleNewsUrl) {
+  const start = Date.now();
+
   const cached = urlCache.get(googleNewsUrl);
-  if (cached) return cached;
+  if (cached && typeof cached === 'object') {
+    const via = cached.publishedAt ? 'cache' : 'none';
+    logInfo({
+      event: 'resolve',
+      cached: true,
+      googleNewsUrl,
+      finalUrl: cached.finalUrl,
+      publishedAt: cached.publishedAt,
+      via,
+      durationMs: Date.now() - start,
+    });
+    return { finalUrl: cached.finalUrl, publishedAt: cached.publishedAt, via };
+  }
 
   const browser = await getBrowser();
 
-  async function tryResolve(timeout) {
+  async function tryOnce(timeoutMs) {
     const context = await browser.newContext({
       userAgent:
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari/537.36',
+      timezoneId: 'Asia/Tokyo',
+      locale: 'ja-JP',
     });
-
     await context.route('**/*', (route) => {
       const type = route.request().resourceType();
       if (type === 'image' || type === 'media' || type === 'font') return route.abort();
       return route.continue();
     });
-
     try {
       const page = await context.newPage();
       await page.goto(googleNewsUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
-
-      // news.google.com 以外のURLへ遷移するのを待つ
       try {
         await page.waitForURL((url) => !url.toString().includes('news.google.com'), {
-          timeout,
+          timeout: timeoutMs,
         });
       } catch {
-        // タイムアウトしても現在のURLを試す
+        /* keep current URL */
       }
-
-      return page.url();
+      const finalUrl = page.url();
+      if (!finalUrl || isGoogleNewsUrl(finalUrl)) {
+        return { finalUrl: null, publishedAt: null, via: 'none' };
+      }
+      const { publishedAt, via } = await extractPublishedAt(page);
+      return { finalUrl, publishedAt, via };
     } finally {
       await context.close();
     }
   }
 
-  // 1回目: 5秒待ち
-  let finalUrl = await tryResolve(5000);
-
-  // まだ news.google.com なら、リトライ（8秒待ち）
-  if (!finalUrl || isGoogleNewsUrl(finalUrl)) {
-    finalUrl = await tryResolve(8000);
+  let result;
+  try {
+    result = await tryOnce(5000);
+    if (!result.finalUrl) result = await tryOnce(8000);
+  } catch (e) {
+    logError({
+      event: 'resolve-error',
+      googleNewsUrl,
+      message: e?.message ?? String(e),
+      durationMs: Date.now() - start,
+    });
+    return { finalUrl: null, publishedAt: null, via: 'error' };
   }
 
-  // 失敗したら壊さない：元URLを返す
-  if (!finalUrl || isGoogleNewsUrl(finalUrl)) return googleNewsUrl;
+  if (!result.finalUrl) {
+    logInfo({
+      event: 'resolve',
+      cached: false,
+      googleNewsUrl,
+      finalUrl: null,
+      publishedAt: null,
+      via: 'none',
+      durationMs: Date.now() - start,
+    });
+    return { finalUrl: null, publishedAt: null, via: 'none' };
+  }
 
-  urlCache.set(googleNewsUrl, finalUrl);
-  return finalUrl;
+  if (result.via !== 'timeout') {
+    urlCache.set(googleNewsUrl, {
+      finalUrl: result.finalUrl,
+      publishedAt: result.publishedAt,
+    });
+  }
+
+  logInfo({
+    event: 'resolve',
+    cached: false,
+    googleNewsUrl,
+    finalUrl: result.finalUrl,
+    publishedAt: result.publishedAt,
+    via: result.via,
+    durationMs: Date.now() - start,
+  });
+
+  return { finalUrl: result.finalUrl, publishedAt: result.publishedAt, via: result.via };
 }
 
 app.get('/clean', async (req, res) => {
   const q = typeof req.query.q === 'string' ? req.query.q : null;
 
-  const feedUrl = buildGoogleNewsRssUrl(q);
-  if (!feedUrl) {
+  if (!q) {
     res.status(400).send('missing q');
     return;
   }
+
+  const feedUrl = buildGoogleNewsRssUrl(q);
 
   let feed;
   try {
     feed = await parser.parseURL(feedUrl);
   } catch (e) {
+    logError({ event: 'feed-parse-error', q, message: e?.message ?? String(e) });
     res.status(502).send(`failed to fetch/parse feed: ${e?.message ?? e}`);
     return;
   }
@@ -118,7 +180,6 @@ app.get('/clean', async (req, res) => {
   const limit = 30;
   const items = (feed.items ?? []).slice(0, limit);
 
-  // 並列は控えめに
   const concurrency = 3;
   let i = 0;
 
@@ -128,15 +189,23 @@ app.get('/clean', async (req, res) => {
       const googleNewsLink = item.link;
       if (!googleNewsLink) continue;
 
-      const finalUrl = await resolveFinalUrl(googleNewsLink);
-
-      const pubDate = item.isoDate ?? item.pubDate ?? undefined;
+      const { finalUrl, publishedAt, via } = await resolveArticle(googleNewsLink);
+      if (!publishedAt) {
+        logInfo({
+          event: 'drop',
+          googleNewsUrl: googleNewsLink,
+          finalUrl,
+          title: item.title,
+          via,
+        });
+        continue;
+      }
 
       out.item({
         title: item.title ?? finalUrl,
-        url: finalUrl, // <link> を最終URLへ
-        guid: googleNewsLink, // guid は元URL（保険）
-        date: pubDate ? new Date(pubDate) : undefined,
+        url: finalUrl,
+        guid: googleNewsLink,
+        date: new Date(publishedAt),
         description: '',
       });
     }
@@ -149,4 +218,4 @@ app.get('/clean', async (req, res) => {
   res.send(xml);
 });
 
-app.listen(3000, '0.0.0.0', () => console.log('listening on 0.0.0.0:3000'));
+app.listen(3000, '0.0.0.0', () => logInfo({ event: 'listen', host: '0.0.0.0', port: 3000 }));
