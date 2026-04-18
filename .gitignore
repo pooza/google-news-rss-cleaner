@@ -8,6 +8,7 @@ Desktop.ini
 *.swp
 dist
 node_modules
+package-lock.json
 *.code-workspace
 .vscode
 config.yaml
