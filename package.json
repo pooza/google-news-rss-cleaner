@@ -6,8 +6,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "lint": "eslint .",
-    "format": "prettier --write \"**/*.{js,cjs}\"",
+    "lint": "biome check .",
+    "format": "biome check --write .",
     "verify": "node scripts/verify-extract.mjs"
   },
   "dependencies": {
@@ -19,7 +19,7 @@
     "rss-parser": "^3.13.0"
   },
   "devDependencies": {
-    "eslint": "^9.39.2",
-    "prettier": "^3.8.0"
+    "@biomejs/biome": "2.6.6",
+    "gobou": "github:pooza/gobou#v0.2.0"
   }
 }

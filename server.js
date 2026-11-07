@@ -1,9 +1,9 @@
 import express from 'express';
-import Parser from 'rss-parser';
-import RSS from 'rss';
-import { chromium } from 'playwright';
 import { LRUCache } from 'lru-cache';
 import syslog from 'modern-syslog';
+import { chromium } from 'playwright';
+import RSS from 'rss';
+import Parser from 'rss-parser';
 import { extractPublishedAt } from './lib/extract.js';
 
 syslog.open('google-news-rss-cleaner', syslog.LOG_PID, syslog.LOG_DAEMON);
