@@ -31,9 +31,15 @@ const urlCache = new LRUCache({
 const FEED_TTL_MS = 1000 * 60 * 10; // 10分
 const feedCache = new LRUCache({ max: 200, ttl: FEED_TTL_MS });
 
+// 最後に取れたフィード（q ごと）。上流に制限されている間はこれを返す。
+// 古さに上限を付け、それを超えたら失敗を返す（死活監視が本当の障害に気づけるように）。
+const STALE_MAX_MS = 1000 * 60 * 60 * 6; // 6時間
+const lastGoodCache = new LRUCache({ max: 200, ttl: STALE_MAX_MS });
+
 // 上流に 429 / 503 を返されたら、しばらく上流へ取りに行かない。
 // 制限は送信元単位なので、q ごとではなくプロセス全体で持つ。
-const DEFAULT_COOLDOWN_MS = 1000 * 60 * 15; // 15分
+// 429 は断続的に出ることがあるので、既定は短めにする。
+const DEFAULT_COOLDOWN_MS = 1000 * 60 * 5; // 5分
 const MAX_COOLDOWN_MS = 1000 * 60 * 60; // 1時間
 let cooldownUntil = 0;
 
@@ -53,15 +59,22 @@ function parseRetryAfter(value) {
   return null;
 }
 
+function staleOrThrow(q, error) {
+  const stale = lastGoodCache.get(q);
+  if (!stale) throw error;
+  const ageSec = Math.round((Date.now() - stale.fetchedAt) / 1000);
+  logInfo({ event: 'feed-stale', q, ageSec, reason: error.message });
+  return { feed: stale.feed, staleAgeSec: ageSec };
+}
+
 async function fetchFeed(q) {
   const cached = feedCache.get(q);
-  if (cached) return cached;
+  if (cached) return { feed: cached };
 
-  const now = Date.now();
-  if (now < cooldownUntil) {
-    throw new UpstreamError(
-      `upstream cooldown until ${new Date(cooldownUntil).toISOString()}`,
-      503,
+  if (Date.now() < cooldownUntil) {
+    return staleOrThrow(
+      q,
+      new UpstreamError(`upstream cooldown until ${new Date(cooldownUntil).toISOString()}`, 503),
     );
   }
 
@@ -85,13 +98,14 @@ async function fetchFeed(q) {
       status: res.status,
       cooldownSec: Math.round(wait / 1000),
     });
-    throw new UpstreamError(`Status code ${res.status}`, 503);
+    return staleOrThrow(q, new UpstreamError(`Status code ${res.status}`, 503));
   }
   if (!res.ok) throw new UpstreamError(`Status code ${res.status}`, 502);
 
   const feed = await parser.parseString(await res.text());
   feedCache.set(q, feed);
-  return feed;
+  lastGoodCache.set(q, { feed, fetchedAt: Date.now() });
+  return { feed };
 }
 
 let browserPromise = null;
@@ -229,7 +243,11 @@ app.get('/clean', async (req, res) => {
 
   let feed;
   try {
-    feed = await fetchFeed(q);
+    const result = await fetchFeed(q);
+    feed = result.feed;
+    if (result.staleAgeSec !== undefined) {
+      res.setHeader('X-Feed-Stale-Age', String(result.staleAgeSec));
+    }
   } catch (e) {
     const status = e instanceof UpstreamError ? e.status : 502;
     logError({ event: 'feed-parse-error', q, status, message: e?.message ?? String(e) });
